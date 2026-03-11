@@ -1,3 +1,15 @@
+// create map of city of Calgary
+var map = L.map('map').setView([51.04619055613446,-114.06160542305022], 10);
+
+// add tile layer
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
+
+// create marker variable
+var marker;
+
 // create client
 var client;
 
@@ -35,11 +47,13 @@ function onConnect() {
     console.log("Connected to MQTT message broker!");
 
     // enable ability to choose topic, send message, and share status
-
     document.getElementById("topic").disabled = false;
     document.getElementById("message").disabled = false;
     document.getElementById("PublishButton").disabled = false;
     document.getElementById("StatusButton").disabled = false;
+
+    // subscribe to temperature topic
+    client.subscribe("ENGO_551/Tony_Nguyen/my_temperature");
 }
 
 // function to end connection
@@ -105,6 +119,38 @@ function publishMessage() {
 // function for when message arrived
 function onMessageArrived(mqtt) {
     console.log("onMessageArrived: " + mqtt.payloadString);
+
+    // get data from GeoJSON
+    var data = JSON.parse(mqtt.payloadString);
+    var long = data.geometry.coordinates[0];
+    var lat = data.geometry.coordinates[1];
+    var temp = data.properties.temperature;
+
+    // choose colour based on temperature
+    var colour;
+
+    if (temp >= -40 && temp < 10) {
+        colour = "blue";
+    } 
+    else if (temp >= 10 && temp < 30) {
+        colour = "green";
+    }
+    else if (temp >= 30 && temp <= 60) {
+        colour = "red";
+    }
+
+    // remove old markers
+    if (marker) {
+        map.removeLayer(marker);
+    }
+    
+    // create marker and add to map
+    var marker = L.circleMarker([lat, long], {
+        color: colour
+    }).addTo(map);
+
+    // add popup with temperature
+    marker.bindPopup("Temperature: " + temp + "°C");
 }
 
 // function to share status
@@ -132,7 +178,7 @@ function shareStatus() {
         // get random temperature value
         var min = -40;
         var max = 60;
-        temp = Math.floor(Math.random() * (max - min + 1) + min);
+        var temp = Math.floor(Math.random() * (max - min + 1) + min);
 
         // generate GeoJSON
         var geojson = {
